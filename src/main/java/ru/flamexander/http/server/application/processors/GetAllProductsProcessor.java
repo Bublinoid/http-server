@@ -23,4 +23,9 @@ public class GetAllProductsProcessor implements RequestProcessor {
         output.write(result.getBytes(StandardCharsets.UTF_8));
         output.flush();
     }
+
+    @Override
+    public String getMethod() {
+        return "GET";
+    }
 }
