@@ -11,13 +11,17 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 
 public class Dispatcher {
     private final Map<String, RequestProcessor> router;
     private final RequestProcessor unknownOperationRequestProcessor;
     private final RequestProcessor optionsRequestProcessor;
     private final RequestProcessor staticResourcesProcessor;
+    private final Set<String> allowedUrls;
 
     private static final Logger logger = LoggerFactory.getLogger(Dispatcher.class.getName());
 
@@ -32,6 +36,11 @@ public class Dispatcher {
         this.unknownOperationRequestProcessor = new DefaultUnknownOperationProcessor();
         this.optionsRequestProcessor = new DefaultOptionsProcessor();
         this.staticResourcesProcessor = new DefaultStaticResourcesProcessor();
+
+        this.allowedUrls = new HashSet<>();
+        for (String key : router.keySet()) {
+            allowedUrls.add(key.split(" ")[1]);
+        }
 
         logger.info("Dispatcher initialized");
     }
@@ -52,9 +61,8 @@ public class Dispatcher {
         RequestProcessor processor = router.get(routeKey);
 
         if (processor == null) {
-
             String path = httpRequest.getUri();
-            if (router.keySet().stream().anyMatch(key -> key.endsWith(" " + path))) {
+            if (allowedUrls.contains(path)) {
                 sendErrorResponse(outputStream, 405, "Method Not Allowed");
             } else {
                 unknownOperationRequestProcessor.execute(httpRequest, outputStream);
@@ -62,40 +70,35 @@ public class Dispatcher {
             return;
         }
 
-        if (!processor.getMethod().equals(httpRequest.getMethod().name())) {
-            sendErrorResponse(outputStream, 405, "Method Not Allowed");
-            return;
-        }
-
-        String acceptHeader = httpRequest.getHeader("Accept");
-        if (acceptHeader != null && !acceptHeader.contains("text/html") && !acceptHeader.contains("*/*")) {
-            sendErrorResponse(outputStream, 406, "Not Acceptable");
-            return;
-        }
-
-        logger.info("Session ID before setting cookie: {}", httpRequest.getSessionId());
+        String sessionId = getSessionId(httpRequest);
+        logger.info("Session ID: {}", sessionId);
 
         StringBuilder responseHeaders = new StringBuilder();
         responseHeaders.append("HTTP/1.1 200 OK\r\n");
         responseHeaders.append("Content-Type: text/html\r\n");
 
-
         String cookieHeader = httpRequest.getHeader("Cookie");
         if (cookieHeader == null || !cookieHeader.contains("SESSIONID")) {
-            String setCookieHeader = "Set-Cookie: SESSIONID=" + httpRequest.getSessionId() + "; Path=/; HttpOnly\r\n";
-            logger.info("Setting new SESSIONID: {}", httpRequest.getSessionId());
+            String setCookieHeader = "Set-Cookie: SESSIONID=" + sessionId + "; Path=/; HttpOnly\r\n";
             responseHeaders.append(setCookieHeader);
-        } else {
-            logger.info("Preserving existing SESSIONID: {}", httpRequest.getSessionId());
         }
 
         responseHeaders.append("\r\n");
         outputStream.write(responseHeaders.toString().getBytes(StandardCharsets.UTF_8));
 
-
-        logger.info("Response headers sent:\n{}", responseHeaders);
         processor.execute(httpRequest, outputStream);
-        logger.info("Session ID after setting cookie: {}", httpRequest.getSessionId());
+    }
+
+    private String getSessionId(HttpRequest httpRequest) {
+        String cookieHeader = httpRequest.getHeader("Cookie");
+        if (cookieHeader != null && cookieHeader.contains("SESSIONID")) {
+            for (String cookie : cookieHeader.split(";")) {
+                if (cookie.trim().startsWith("SESSIONID=")) {
+                    return cookie.trim().substring("SESSIONID=".length());
+                }
+            }
+        }
+        return UUID.randomUUID().toString();
     }
 
     private void sendErrorResponse(OutputStream outputStream, int statusCode, String message) throws IOException {

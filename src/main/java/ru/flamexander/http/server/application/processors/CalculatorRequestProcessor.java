@@ -6,12 +6,14 @@ import ru.flamexander.http.server.processors.RequestProcessor;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.Collections;
+import java.util.Set;
 
 public class CalculatorRequestProcessor implements RequestProcessor {
     @Override
     public void execute(HttpRequest httpRequest, OutputStream output) throws IOException {
         String acceptHeader = httpRequest.getHeader("Accept");
-        if (acceptHeader != null && !acceptHeader.contains("text/html")) {
+        if (acceptHeader != null && !getSupportedContentTypes().contains(acceptHeader)) {
             String response = "HTTP/1.1 406 Not Acceptable\r\n\r\n<html><body><h1>406 Not Acceptable</h1></body></html>";
             output.write(response.getBytes(StandardCharsets.UTF_8));
             return;
@@ -29,5 +31,10 @@ public class CalculatorRequestProcessor implements RequestProcessor {
     @Override
     public String getMethod() {
         return "GET";
+    }
+
+    @Override
+    public Set<String> getSupportedContentTypes() {
+        return Collections.singleton("text/html");
     }
 }
