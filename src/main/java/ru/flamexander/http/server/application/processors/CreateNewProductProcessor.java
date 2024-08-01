@@ -25,4 +25,9 @@ public class CreateNewProductProcessor implements RequestProcessor {
                 "\r\n" + jsonOutItem;
         output.write(response.getBytes(StandardCharsets.UTF_8));
     }
+
+    @Override
+    public String getMethod() {
+        return "POST";
+    }
 }

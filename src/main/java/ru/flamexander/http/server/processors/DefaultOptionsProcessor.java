@@ -17,4 +17,9 @@ public class DefaultOptionsProcessor implements RequestProcessor {
                 "Access-Control-Max-Age: 86400";
         output.write(response.getBytes(StandardCharsets.UTF_8));
     }
+
+    @Override
+    public String getMethod() {
+        return "OPTIONS";
+    }
 }
